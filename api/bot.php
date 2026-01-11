@@ -172,27 +172,30 @@ if ($resposta) {
 // FUNÇÃO AUXILIAR
 // ---------------------------------------------------------
 function chamarApi($metodo, $url, $dados = null) {
+
     $opcoes = [
         'http' => [
-            'header'  => "Content-type: application/json\r\n",
             'method'  => $metodo,
             'ignore_errors' => true,
-            'timeout' => 10 // Timeout para não travar o bot se a API demorar
+            'timeout' => 10,
+            'header'  => "Content-type: application/json\r\n" .
+                         "X-Api-Key: " . API_SECRET . "\r\n"
         ]
+
     ];
-    
+
     if ($dados) {
         $opcoes['http']['content'] = json_encode($dados);
     }
 
     $contexto = stream_context_create($opcoes);
-    $resultado = @file_get_contents($url, false, $contexto); // @ suprime warnings na tela
-    
+    $resultado = @file_get_contents($url, false, $contexto);
+
     if ($resultado === FALSE) {
-        // Erro de conexão (DNS, Timeout, Servidor fora do ar)
         return ["erro" => "Falha de conexão com a API"];
     }
 
     return json_decode($resultado, true);
+
 }
 ?>

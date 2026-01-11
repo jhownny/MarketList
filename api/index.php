@@ -28,6 +28,17 @@ header("Content-Type: application/json; charset=UTF-8");
 
 require_once __DIR__ . '/../../config.php';
 
+$chaveEnviada = $_SERVER['HTTP_X_API_KEY'] ?? '';
+
+if ($chaveEnviada !== API_SECRET) {
+    http_response_code(403);
+    echo json_encode([
+        "erro" => "Acesso Negado",
+        "mensagem" => "Chave de API invalida ou ausente."
+    ]);
+    exit;
+}
+
 $mysqli = new mysqli(
     $db_config['host'], 
     $db_config['user'], 
