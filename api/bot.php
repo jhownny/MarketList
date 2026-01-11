@@ -10,11 +10,9 @@ $botToken = $bot_config['token'];
 $telegramApi = "https://api.telegram.org/bot$botToken";
 
 // URL da API
-// DICA: Se o bot estiver no mesmo servidor da API, use "http://127.0.0.1/api"
-// para evitar bloqueios de Loopback e ser mais rápido.
 $minhaApiUrl = "https://www.jhownnyprojects.com.br/api"; 
 
-// 1. Recebe e decodifica o JSON do Telegram
+// Recebe e decodifica o JSON do Telegram
 $content = file_get_contents("php://input");
 $update = json_decode($content, true);
 
@@ -82,7 +80,6 @@ elseif ($texto == "/start" || $texto == "/ajuda") {
 }
 
 // --- VERIFICAÇÃO DE LOGIN ---
-// Se não caiu nos comandos acima e não tem usuário, bloqueia.
 elseif (!$meuUsuario) {
     $resposta = "🔒 *Acesso Bloqueado*\n\nEu não sei quem você é.\n" .
                 "Por favor, conecte-se digitando:\n" .
@@ -92,7 +89,7 @@ elseif (!$meuUsuario) {
 // --- USUÁRIO LOGADO: PROCESSAR COMPRAS ---
 else {
     
-    // REGEX PODEROSA (Aceita Multiplicação)
+    // REGEX (Aceita Multiplicação)
     // Grupo 1: Ação (Comprei/Gastei)
     // Grupo 2: Nome do Produto
     // Grupo 3: Preço Unitário
@@ -119,14 +116,14 @@ else {
             "usuario_id" => $meuUsuario['id'],
             "grupo_id"   => 1, // Padrão: Mercado
             "produto"    => $produtoNome,
-            "preco"      => $precoTotal // Envia o valor TOTAL
+            "preco"      => $precoTotal
         ];
 
         // Envia para a API
         $resultado = chamarApi('POST', "$minhaApiUrl/itens", $novoItem);
 
         if (isset($resultado['status']) && $resultado['status'] == 'item adicionado') {
-            // Resposta bonitinha com formatação de moeda
+            // Resposta com formatação de moeda
             $totalFormatado = number_format($precoTotal, 2, ',', '.');
             $resposta = "📝 *Anotado:* $produtoNome\n💰 *Valor:* R$ $totalFormatado";
             

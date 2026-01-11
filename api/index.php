@@ -213,7 +213,7 @@ switch ($endpoint) {
                 http_response_code(400); echo json_encode(["erro" => "Informe usuario_id e grupo_id"]); break;
             }
 
-            // 1. Calcula o total gasto
+            //Calcula o total gasto
             $stmt = $mysqli->prepare("SELECT SUM(preco) as total FROM itens WHERE usuario_id = ? AND grupo_id = ? AND status = 'pendente'");
             $stmt->bind_param("ii", $input['usuario_id'], $input['grupo_id']);
             $stmt->execute();
@@ -221,7 +221,7 @@ switch ($endpoint) {
             $total = $res['total'] ?? 0;
             $stmt->close();
 
-            // 2. Marca tudo como finalizado
+            //Marca tudo como finalizado
             $stmtUpdate = $mysqli->prepare("UPDATE itens SET status = 'finalizado', data_finalizacao = NOW() WHERE usuario_id = ? AND grupo_id = ? AND status = 'pendente'");
             $stmtUpdate->bind_param("ii", $input['usuario_id'], $input['grupo_id']);
             
@@ -255,9 +255,7 @@ switch ($endpoint) {
             $user = $stmt->get_result()->fetch_assoc();
 
             if ($user && password_verify($input['senha'], $user['senha'])) {
-                // Senha correta!
                 
-                // Se o Bot enviou um chat_id, vamos vincular agora
                 if (!empty($input['telegram_chat_id'])) {
                     $stmtUp = $mysqli->prepare("UPDATE usuarios SET telegram_chat_id = ? WHERE id = ?");
                     $stmtUp->bind_param("si", $input['telegram_chat_id'], $user['id']);
