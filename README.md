@@ -83,15 +83,10 @@ Resultado: O sistema soma todos os itens pendentes, exibe o total na tela e arqu
 🏗️ Arquitetura do Sistema
 O fluxo de dados segue o padrão de gateway via API:
 
-~~~Snippet de código
-graph LR
-    A[Usuário Telegram] -- Mensagem --> B(bot.php)
-    B -- JSON Request --> C{API MarketList}
-    C -- Query --> D[(MySQL Database)]
-    D -- Dados --> C
-    C -- JSON Response --> B
-    B -- Mensagem --> A
-~~~
+<p align="center">
+  <img src="./assets/img/Graph_RL-Arquitetura.png" alt="Arquitetura do Sistema" width="1000">
+</p>
+
 Isso garante que regras de negócio (como validação de usuário ou cálculo de totais) fiquem centralizadas na API, permitindo que no futuro um App Mobile consuma as mesmas regras.
 
 🔮 Roadmap (Futuro)
@@ -106,3 +101,4 @@ Isso garante que regras de negócio (como validação de usuário ou cálculo de
 
 👨‍💻 Autor
 Desenvolvido por Jhonata (Jhownny).
+
