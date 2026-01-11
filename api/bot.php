@@ -38,7 +38,7 @@ if (stripos($texto, "Comprei") !== false || stripos($texto, "Gastei") !== false)
         // Nota: O ideal é usar cURL, mas para simplificar:
         $dadosParaSalvar = [
             'usuario_id' => 1, // Fixo por enquanto, depois vinculamos ao ChatID
-            'grupo_id' => 1,   // Fixo: Mercado
+            'grupo_id' => 2,   // Fixo: Mercado
             'produto' => $produto,
             'preco' => (float)$preco
         ];
@@ -56,7 +56,7 @@ if (stripos($texto, "Comprei") !== false || stripos($texto, "Gastei") !== false)
     }
 
 } elseif (strtolower($texto) == "/start") {
-    $resposta = "Olá, $usuarioNome! Eu sou o Nexus. Diga o que comprou.";
+    $resposta = "Olá, $usuarioNome! Eu sou o MarketList. Diga o que comprou.";
 } else {
     $resposta = "Ainda não sei o que é '$texto'. Tente 'Comprei [coisa] [preço]'.";
 }
@@ -70,7 +70,7 @@ function salvarItemInterno($dados) {
     // URL da sua API que criamos no passo anterior
     $url = 'https://www.jhownnyprojects.com.br/api/itens'; 
     
-    $options = [
+    $option = [
         'https' => [
             'header'  => "Content-type: application/json\r\n",
             'method'  => 'POST',
