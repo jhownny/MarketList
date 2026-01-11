@@ -67,18 +67,24 @@ function limpar_utf8($array) {
 switch ($endpoint) {
 
     // ====================================================
-    // ROTA: USUARIOS (MANTIDA)
+    // ROTA: USUARIOS (ATUALIZADA)
     // ====================================================
     case 'usuarios':
         if ($method == 'GET') {
-            $query = "SELECT id, nome, email, ativo, created_at FROM usuarios";
-            $result = $mysqli->query($query);
-            $data = [];
-            while ($row = $result->fetch_assoc()) {
-                $data[] = limpar_utf8($row);
+            // Permite o Bot perguntar: "Quem é o dono do chat_id 12345?"
+            $chat_id = $_GET['telegram_chat_id'] ?? null;
+            
+            $sql = "SELECT id, nome, email FROM usuarios";
+            if ($chat_id) {
+                // Filtro específico para o Bot
+                $sql .= " WHERE telegram_chat_id = '" . $mysqli->real_escape_string($chat_id) . "'";
             }
+
+            $result = $mysqli->query($sql);
+            $data = [];
+            while ($row = $result->fetch_assoc()) { $data[] = limpar_utf8($row); }
             echo json_encode($data);
-        } 
+        }
         elseif ($method == 'POST') {
             $input = json_decode(file_get_contents('php://input'), true);
             if (empty($input['nome']) || empty($input['email']) || empty($input['senha'])) {
@@ -231,6 +237,45 @@ switch ($endpoint) {
         }
         break;
 
+    // ====================================================
+    // ROTA: LOGIN (NOVA - Para o comando /conectar)
+    // ====================================================
+    case 'login':
+        if ($method == 'POST') {
+            $input = json_decode(file_get_contents('php://input'), true);
+
+            if (empty($input['email']) || empty($input['senha'])) {
+                http_response_code(400); echo json_encode(["erro" => "Email e senha obrigatórios"]); break;
+            }
+
+            // Busca usuário pelo email
+            $stmt = $mysqli->prepare("SELECT id, nome, senha FROM usuarios WHERE email = ?");
+            $stmt->bind_param("s", $input['email']);
+            $stmt->execute();
+            $user = $stmt->get_result()->fetch_assoc();
+
+            if ($user && password_verify($input['senha'], $user['senha'])) {
+                // Senha correta!
+                
+                // Se o Bot enviou um chat_id, vamos vincular agora
+                if (!empty($input['telegram_chat_id'])) {
+                    $stmtUp = $mysqli->prepare("UPDATE usuarios SET telegram_chat_id = ? WHERE id = ?");
+                    $stmtUp->bind_param("si", $input['telegram_chat_id'], $user['id']);
+                    $stmtUp->execute();
+                }
+
+                echo json_encode([
+                    "status" => "logado",
+                    "id" => $user['id'],
+                    "nome" => $user['nome']
+                ]);
+            } else {
+                http_response_code(401); // Unauthorized
+                echo json_encode(["erro" => "Credenciais inválidas"]);
+            }
+        }
+        break;
+    
     // ====================================================
     // ROTA 404
     // ====================================================
