@@ -99,6 +99,6 @@ Isso garante que regras de negócio (como validação de usuário ou cálculo de
 
 [ ] Relatórios: Gráficos mensais de evolução de gastos.
 
-👨‍💻 Autor
-Desenvolvido por Jhonata (Jhownny).
+<br><p align=center> 👨‍💻 Desenvolvido por Jhonata (Jhownny). </p>  
+
 
