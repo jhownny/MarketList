@@ -48,14 +48,14 @@ O projeto foi construído priorizando performance e arquitetura limpa:
 
 ## 🔌 Como Usar (Comandos do Bot)
 
-### 1. Configuração Inicial
+### Configuração Inicial
 Para vincular sua conta do Telegram ao seu usuário no sistema:
 
 ~~~Plaintext
 /conectar seu@email.com sua_senha
 ~~~
 
-2. Registrando Compras
+1. Registrando Compras
 Basta digitar naturalmente. O sistema entende "Comprei" ou "Gastei".
 
 Item simples:
@@ -72,7 +72,7 @@ Comprei Cerveja 3.99 x 6
 ~~~
 Resultado: O sistema calcula (3.99 * 6), salva o item como "Cerveja (6x)" e o valor total de R$ 23,94.
 
-3. Fechando a Conta
+2. Fechando a Conta
 Ao terminar as compras, para receber o resumo:
 
 ~~~Plaintext
@@ -100,5 +100,6 @@ Isso garante que regras de negócio (como validação de usuário ou cálculo de
 [ ] Relatórios: Gráficos mensais de evolução de gastos.
 
 <br><p align=center> 👨‍💻 Desenvolvido por Jhonata (Jhownny). </p>  
+
 
 
