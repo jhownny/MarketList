@@ -73,7 +73,7 @@ elseif ($texto == "/sair") {
 
 // --- COMANDO: /start ou /ajuda ---
 elseif ($texto == "/start" || $texto == "/ajuda") {
-    $resposta = "Olá, $nomeTelegram! Eu sou o Nexus 🤖\n\n" .
+    $resposta = "Olá, $nomeTelegram! Eu sou o Market List 🤖\n\n" .
                 "📌 *Comandos:*\n" .
                 "• `Comprei Item Preço` (Ex: Comprei Pão 5.90)\n" .
                 "• `Comprei Item Preço x Qtd` (Ex: Comprei Leite 4.00 x 3)\n" .
