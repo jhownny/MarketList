@@ -1,117 +1,186 @@
 <?php
-// bot.php
-// NÃO TEM MAIS CONEXÃO COM BANCO DE DADOS AQUI!
+// ---------------------------------------------------------
+// BOT TELEGRAM - INTEGRAÇÃO VIA API (SEM BANCO DIRETO)
+// ---------------------------------------------------------
 
-$botToken = "8406912999:AAFEdNcWGUOL3XT25MkkDY-A_pnyMQ826G8"; 
+require_once __DIR__ . '/../../config.php';
+
+// CONFIGURAÇÕES
+$botToken = $bot_config['token'];
 $telegramApi = "https://api.telegram.org/bot$botToken";
-$minhaApiUrl = "https://www.jhownnyprojects.com.br/api"; // URL da SUA API
 
-// 1. Recebe dados do Telegram
+// URL da API
+// DICA: Se o bot estiver no mesmo servidor da API, use "http://127.0.0.1/api"
+// para evitar bloqueios de Loopback e ser mais rápido.
+$minhaApiUrl = "https://www.jhownnyprojects.com.br/api"; 
+
+// 1. Recebe e decodifica o JSON do Telegram
 $content = file_get_contents("php://input");
 $update = json_decode($content, true);
+
+// Se não houver mensagem válida, encerra silenciosamente
 if (!$update || !isset($update["message"])) exit;
 
 $chatId = $update["message"]["chat"]["id"];
-$texto = trim($update["message"]["text"]);
-$nomeTelegram = $update["message"]["from"]["first_name"];
+$texto = trim($update["message"]["text"] ?? ''); // Garante que não dê erro se for nulo
+$nomeTelegram = $update["message"]["from"]["first_name"] ?? 'Usuário';
 
 $resposta = "";
 
 // ---------------------------------------------------------
-// VERIFICAÇÃO DE IDENTIDADE (VIA API)
+// 2. VERIFICAÇÃO DE IDENTIDADE
 // ---------------------------------------------------------
-// Pergunta pra API: "Existe algum usuário com esse Chat ID?"
+// Consulta a API para saber quem é o dono deste Chat ID
 $usuarios = chamarApi('GET', "$minhaApiUrl/usuarios?telegram_chat_id=$chatId");
-$meuUsuario = $usuarios[0] ?? null; // Pega o primeiro resultado se existir
+
+// Se a API retornar erro ou array vazio, o usuário é null
+$meuUsuario = (!empty($usuarios) && isset($usuarios[0])) ? $usuarios[0] : null;
 
 // ---------------------------------------------------------
-// LÓGICA DE COMANDOS
+// 3. ROTEAMENTO DE COMANDOS
 // ---------------------------------------------------------
 
-// 1. TENTATIVA DE LOGIN (/conectar email senha)
+// --- COMANDO: /conectar email senha ---
 if (strpos($texto, "/conectar") === 0) {
-    $partes = preg_split('/\s+/', $texto);
+    $partes = preg_split('/\s+/', $texto); // Divide por espaços
+    
     if (count($partes) < 3) {
-        $resposta = "⚠️ Use: /conectar email senha";
+        $resposta = "⚠️ Formato inválido.\nUse: `/conectar seu@email.com sua_senha`";
     } else {
-        // Envia para API validar
         $loginData = [
             "email" => $partes[1],
             "senha" => $partes[2],
-            "telegram_chat_id" => $chatId // Manda o ID pra API vincular
+            "telegram_chat_id" => $chatId
         ];
         
         $loginResult = chamarApi('POST', "$minhaApiUrl/login", $loginData);
 
         if (isset($loginResult['status']) && $loginResult['status'] == 'logado') {
-            $resposta = "✅ Olá, " . $loginResult['nome'] . "! Você está conectado.";
+            $resposta = "✅ *Conectado com sucesso!*\nBem-vindo, " . $loginResult['nome'] . ".";
         } else {
             $resposta = "❌ Email ou senha incorretos.";
         }
     }
 }
 
-// 2. SE NÃO ESTIVER LOGADO
-elseif (!$meuUsuario) {
-    $resposta = "🔒 Você não está conectado.\nDigite: /conectar seu@email.com sua_senha";
+// --- COMANDO: /sair (Deslogar) ---
+elseif ($texto == "/sair") {
+    // Para deslogar, poderíamos criar uma rota na API, 
+    // mas por enquanto vamos apenas avisar como trocar.
+    // O ideal seria limpar o telegram_chat_id no banco via API.
+    $resposta = "Para desconectar, peça ao administrador ou use /conectar com outra conta.";
 }
 
-// 3. SE JÁ ESTIVER LOGADO (Salvar Compras)
+// --- COMANDO: /start ou /ajuda ---
+elseif ($texto == "/start" || $texto == "/ajuda") {
+    $resposta = "Olá, $nomeTelegram! Eu sou o Nexus 🤖\n\n" .
+                "📌 *Comandos:*\n" .
+                "• `Comprei Item Preço` (Ex: Comprei Pão 5.90)\n" .
+                "• `Comprei Item Preço x Qtd` (Ex: Comprei Leite 4.00 x 3)\n" .
+                "• `/finalizar` (Fecha a lista)\n" .
+                "• `/conectar` (Login)";
+}
+
+// --- VERIFICAÇÃO DE LOGIN ---
+// Se não caiu nos comandos acima e não tem usuário, bloqueia.
+elseif (!$meuUsuario) {
+    $resposta = "🔒 *Acesso Bloqueado*\n\nEu não sei quem você é.\n" .
+                "Por favor, conecte-se digitando:\n" .
+                "`/conectar seu@email.com sua_senha`";
+}
+
+// --- USUÁRIO LOGADO: PROCESSAR COMPRAS ---
 else {
-    // Regex: Comprei [algo] [preço]
-    if (preg_match('/(Comprei|Gastei)\s+(.+?)\s+(\d+[.,]?\d*)/i', $texto, $matches)) {
-        $produto = trim($matches[2]);
-        $preco = str_replace(',', '.', $matches[3]);
+    
+    // REGEX PODEROSA (Aceita Multiplicação)
+    // Grupo 1: Ação (Comprei/Gastei)
+    // Grupo 2: Nome do Produto
+    // Grupo 3: Preço Unitário
+    // Grupo 4: Quantidade (Opcional)
+    $pattern = '/(Comprei|Gastei)\s+(.+?)\s+(\d+[.,]?\d*)(?:\s*[xX*]\s*(\d+))?$/i';
+
+    if (preg_match($pattern, $texto, $matches)) {
+        
+        // Extração e Tratamento
+        $produtoNome = trim($matches[2]);
+        $precoUnitario = (float)str_replace(',', '.', $matches[3]);
+        $quantidade = (isset($matches[4]) && $matches[4] !== '') ? (int)$matches[4] : 1;
+        
+        // Cálculo do Total
+        $precoTotal = $precoUnitario * $quantidade;
+
+        // Se tiver mais de 1, adiciona a qtd no nome para ficar claro na lista
+        if ($quantidade > 1) {
+            $produtoNome .= " ({$quantidade}x)";
+        }
 
         // Monta o pacote para a API
         $novoItem = [
-            "usuario_id" => $meuUsuario['id'], // ID que veio da consulta da API lá em cima
-            "grupo_id" => 1, // Mercado (Fixo por enquanto)
-            "produto" => $produto,
-            "preco" => (float)$preco
+            "usuario_id" => $meuUsuario['id'],
+            "grupo_id"   => 1, // Padrão: Mercado
+            "produto"    => $produtoNome,
+            "preco"      => $precoTotal // Envia o valor TOTAL
         ];
 
-        // Manda a API salvar
+        // Envia para a API
         $resultado = chamarApi('POST', "$minhaApiUrl/itens", $novoItem);
 
         if (isset($resultado['status']) && $resultado['status'] == 'item adicionado') {
-            $resposta = "📝 Salvo na nuvem: $produto (R$ $preco)";
+            // Resposta bonitinha com formatação de moeda
+            $totalFormatado = number_format($precoTotal, 2, ',', '.');
+            $resposta = "📝 *Anotado:* $produtoNome\n💰 *Valor:* R$ $totalFormatado";
+            
+            if ($quantidade > 1) {
+                $resposta .= "\n_(Calculado: $matches[3] x $quantidade)_";
+            }
         } else {
-            $resposta = "❌ A API retornou erro: " . ($resultado['erro'] ?? 'Desconhecido');
+            $erroMsg = $resultado['erro'] ?? 'Erro desconhecido na API';
+            $resposta = "❌ Falha ao salvar: " . $erroMsg;
         }
+
     } 
+    
+    // --- FINALIZAR COMPRA ---
     elseif ($texto == "/finalizar") {
-        // Exemplo de chamar o finalizar via API
         $dados = ["usuario_id" => $meuUsuario['id'], "grupo_id" => 1];
         $res = chamarApi('POST', "$minhaApiUrl/finalizar", $dados);
         
         if (isset($res['total_gasto'])) {
-            $resposta = "🛒 Lista fechada! Total: R$ " . $res['total_gasto'];
+            $total = number_format($res['total_gasto'], 2, ',', '.');
+            $resposta = "🛒 *Lista Finalizada!*\n\n" . 
+                        "📦 Itens fechados: " . $res['itens_fechados'] . "\n" .
+                        "💸 *Total Gasto: R$ $total*";
         } else {
-            $resposta = "Erro ao finalizar.";
+            $resposta = "⚠️ Nada pendente para finalizar ou erro no sistema.";
         }
     }
+    
+    // --- NÃO ENTENDEU ---
     else {
-        $resposta = "Oi " . $meuUsuario['nome'] . "! Diga 'Comprei Café 10'";
+        $resposta = "Oi " . $meuUsuario['nome'] . "! Não entendi.\n" .
+                    "Tente: `Comprei Café 10` ou `Comprei Café 5 x 2`";
     }
 }
 
 // ---------------------------------------------------------
-// ENVIA RESPOSTA AO TELEGRAM
+// 4. ENVIA RESPOSTA AO TELEGRAM
 // ---------------------------------------------------------
 if ($resposta) {
-    file_get_contents($telegramApi . "/sendMessage?chat_id=$chatId&text=" . urlencode($resposta));
+    // Adicionei 'parse_mode' => 'Markdown' para deixar negrito/itálico funcionar
+    $urlEnvio = $telegramApi . "/sendMessage?chat_id=$chatId&parse_mode=Markdown&text=" . urlencode($resposta);
+    file_get_contents($urlEnvio);
 }
 
 // ---------------------------------------------------------
-// FUNÇÃO AUXILIAR: FAZ A PONTE HTTP
+// FUNÇÃO AUXILIAR
 // ---------------------------------------------------------
 function chamarApi($metodo, $url, $dados = null) {
     $opcoes = [
         'http' => [
             'header'  => "Content-type: application/json\r\n",
             'method'  => $metodo,
-            'ignore_errors' => true // Para ler o corpo mesmo se der erro 400/500
+            'ignore_errors' => true,
+            'timeout' => 10 // Timeout para não travar o bot se a API demorar
         ]
     ];
     
@@ -120,8 +189,13 @@ function chamarApi($metodo, $url, $dados = null) {
     }
 
     $contexto = stream_context_create($opcoes);
-    $resultado = file_get_contents($url, false, $contexto);
+    $resultado = @file_get_contents($url, false, $contexto); // @ suprime warnings na tela
     
+    if ($resultado === FALSE) {
+        // Erro de conexão (DNS, Timeout, Servidor fora do ar)
+        return ["erro" => "Falha de conexão com a API"];
+    }
+
     return json_decode($resultado, true);
 }
 ?>
