@@ -174,7 +174,7 @@ if ($resposta) {
 function chamarApi($metodo, $url, $dados = null) {
 
     $opcoes = [
-        'https' => [
+        'http' => [
             'method'  => $metodo,
             'ignore_errors' => true,
             'timeout' => 10,
@@ -185,7 +185,7 @@ function chamarApi($metodo, $url, $dados = null) {
     ];
 
     if ($dados) {
-        $opcoes['https']['content'] = json_encode($dados);
+        $opcoes['http']['content'] = json_encode($dados);
     }
 
     $contexto = stream_context_create($opcoes);
