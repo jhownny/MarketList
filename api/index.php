@@ -28,7 +28,7 @@ header("Content-Type: application/json; charset=UTF-8");
 
 require_once __DIR__ . '/../../config.php';
 
-$chaveEnviada = $_SERVER['HTTPS_API_KEY'] ?? '';
+$chaveEnviada = $_SERVER['HTTP_X_API_KEY'] ?? '';
 
 if ($chaveEnviada !== API_SECRET) {
     http_response_code(403);

@@ -179,7 +179,7 @@ function chamarApi($metodo, $url, $dados = null) {
             'ignore_errors' => true,
             'timeout' => 10,
             'header'  => "Content-type: application/json\r\n" .
-                         "Api-Key: " . API_SECRET . "\r\n"
+                         "X-Api-Key: " . API_SECRET . "\r\n"
         ]
 
     ];
