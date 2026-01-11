@@ -174,18 +174,18 @@ if ($resposta) {
 function chamarApi($metodo, $url, $dados = null) {
 
     $opcoes = [
-        'http' => [
+        'https' => [
             'method'  => $metodo,
             'ignore_errors' => true,
             'timeout' => 10,
             'header'  => "Content-type: application/json\r\n" .
-                         "X-Api-Key: " . API_SECRET . "\r\n"
+                         "Api-Key: " . API_SECRET . "\r\n"
         ]
 
     ];
 
     if ($dados) {
-        $opcoes['http']['content'] = json_encode($dados);
+        $opcoes['https']['content'] = json_encode($dados);
     }
 
     $contexto = stream_context_create($opcoes);
