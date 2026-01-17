@@ -75,6 +75,7 @@ elseif ($texto == "/start" || $texto == "/ajuda") {
                 "📌 *Comandos:*\n" .
                 "• `Comprei Item Preço` (Ex: Comprei Pão 5.90)\n" .
                 "• `Comprei Item Preço x Qtd` (Ex: Comprei Leite 4.00 x 3)\n" .
+                "• `/listar` (Ver carrinho e total parcial)\n" .
                 "• `/finalizar` (Fecha a lista)\n" .
                 "• `/conectar` (Login)";
 }
