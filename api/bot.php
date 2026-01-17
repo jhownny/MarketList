@@ -137,6 +137,38 @@ else {
 
     } 
     
+    // --- LISTAR COMPRAS PENDENTES ---
+    elseif ($texto == "/listar" || $texto == "/lista") {
+
+        // 1. Consulta os itens pendentes na API
+        $url = "$minhaApiUrl/itens?usuario_id=" . $meuUsuario['id'] . "&status=pendente";
+        $itens = chamarApi('GET', $url);
+
+        // 2. Verifica se a lista veio vazia ou com erro
+        if (empty($itens) || isset($itens['erro'])) {
+            $resposta = "🛒 *Sua lista está vazia.*\n\nQue tal adicionar algo?\n_Ex: Comprei Arroz 20.00_";
+        } else {
+            // 3. Monta a mensagem bonitinha (Iteração)
+            $msg = "📋 *Lista Atual (Pendentes):*\n\n";
+            $totalParcial = 0;
+
+            foreach ($itens as $item) {
+                $precoFormatado = number_format($item['preco'], 2, ',', '.');
+                $msg .= "▪️ {$item['produto']} — R$ {$precoFormatado}\n";
+                
+                // Soma para mostrar o total parcial
+                $totalParcial += $item['preco'];
+            }
+
+            $totalGeral = number_format($totalParcial, 2, ',', '.');
+            
+            $msg .= "\n💰 *Total Parcial: R$ {$totalGeral}*";
+            $msg .= "\n\n_Digite /finalizar para fechar a conta._";
+            
+            $resposta = $msg;
+        }
+    }
+
     // --- FINALIZAR COMPRA ---
     elseif ($texto == "/finalizar") {
         $dados = ["usuario_id" => $meuUsuario['id'], "grupo_id" => 1];
