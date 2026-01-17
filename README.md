@@ -23,6 +23,8 @@ Ao invés de abrir um aplicativo, navegar por menus e preencher formulários, o 
 - **🧠 Processamento de Linguagem Natural (NLP/Regex):**
   - Entende comandos como: `Comprei Picanha 89.90`
   - Suporta multiplicadores automáticos: `Comprei Leite 4.59 x 12` (Calcula o total e registra a quantidade).
+- **📝 Conferência em Tempo Real:**
+  - Comando `/listar` para visualizar itens no carrinho e o **subtotal gasto** antes de chegar ao caixa.
 - **🔐 Autenticação Híbrida:**
   - Sistema de Login via API (`/conectar email senha`).
   - Vinculação segura de dispositivo (Chat ID do Telegram atrelado ao User ID do banco).
@@ -50,11 +52,9 @@ O projeto foi construído priorizando performance e arquitetura limpa:
 
 ### Configuração Inicial
 Para vincular sua conta do Telegram ao seu usuário no sistema:
-
-~~~Plaintext
+~~~text
 /conectar seu@email.com sua_senha
 ~~~
-
 1. Registrando Compras
 Basta digitar naturalmente. O sistema entende "Comprei" ou "Gastei".
 
@@ -72,20 +72,26 @@ Comprei Cerveja 3.99 x 6
 ~~~
 Resultado: O sistema calcula (3.99 * 6), salva o item como "Cerveja (6x)" e o valor total de R$ 23,94.
 
-2. Fechando a Conta
-Ao terminar as compras, para receber o resumo:
+2. Conferindo o Carrinho
+Para ver o que já foi adicionado e o total parcial antes de fechar a conta:
+
+~~~Plaintext
+/listar
+~~~
+Resultado: Retorna a lista de itens pendentes e a soma atual (ex: Total Parcial: R$ 49,84).
+
+3. Fechando a Conta
+Ao terminar as compras, para receber o resumo e arquivar a lista:
 
 ~~~Plaintext
 /finalizar
 ~~~
-Resultado: O sistema soma todos os itens pendentes, exibe o total na tela e arquiva a lista.
+Resultado: O sistema soma todos os itens, exibe o total na tela, marca como "finalizado" no banco e limpa o carrinho para a próxima compra.
 
 🏗️ Arquitetura do Sistema
 O fluxo de dados segue o padrão de gateway via API:
 
-<p align="center">
-  <img src="./assets/img/Graph_RL-Arquitetura.png" alt="Arquitetura do Sistema" width="1000">
-</p>
+<p align="center"> <img src="./assets/img/Graph_RL-Arquitetura.png" alt="Arquitetura do Sistema" width="1000"> </p>
 
 Isso garante que regras de negócio (como validação de usuário ou cálculo de totais) fiquem centralizadas na API, permitindo que no futuro um App Mobile consuma as mesmas regras.
 
@@ -98,5 +104,6 @@ Isso garante que regras de negócio (como validação de usuário ou cálculo de
 [ ] Múltiplas Listas: Suporte para alternar entre lista de "Mercado", "Viagem" e "Obras".
 
 [ ] Relatórios: Gráficos mensais de evolução de gastos.
+
 
 <br><p align=center> 👨‍💻 Desenvolvido por Jhonata (Jhownny). </p>  
