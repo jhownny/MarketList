@@ -211,6 +211,30 @@ switch ($endpoint) {
             if ($stmt->execute()) echo json_encode(["status" => "deletado"]);
             else echo json_encode(["erro" => $stmt->error]);
         }
+        
+
+        // PUT: Editar item existente (Atualização de Nome e Preço)
+        elseif ($method == 'PUT') {
+            $input = json_decode(file_get_contents('php://input'), true);
+            
+            // Validação para garantir que recebemos o ID e os novos dados
+            if (empty($input['id']) || empty($input['produto']) || !isset($input['preco'])) {
+                http_response_code(400); 
+                echo json_encode(["erro" => "Faltam dados (id, produto, preco)"]); 
+                break;
+            }
+            
+            $stmt = $mysqli->prepare("UPDATE itens SET produto = ?, preco = ? WHERE id = ?");
+            // "sdi" significa: String (produto), Double (preco), Integer (id)
+            $stmt->bind_param("sdi", $input['produto'], $input['preco'], $input['id']);
+            
+            if ($stmt->execute()) {
+                echo json_encode(["status" => "item atualizado"]);
+            } else {
+                http_response_code(500); 
+                echo json_encode(["erro" => $stmt->error]);
+            }
+        }
         break;
 
     // ====================================================
