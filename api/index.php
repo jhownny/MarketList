@@ -78,6 +78,19 @@ function limpar_utf8($array) {
 switch ($endpoint) {
 
     // ====================================================
+    // ROTA: VERIFICAR ATUALIZAÇÃO
+    // ====================================================
+    case 'atualizacao':
+        if ($method == 'GET') {
+            echo json_encode([
+                "versao_nome" => "1.1.0",
+                "build_numero" => 5, 
+                "url_apk" => "https://github.com/jhownny/marketlist_mobile/releases/download/v1.1.0/MarketList_v1.1.0.apk"
+            ]);
+        }
+    break;
+
+    // ====================================================
     // ROTA: USUARIOS (ATUALIZADA)
     // ====================================================
     case 'usuarios':
