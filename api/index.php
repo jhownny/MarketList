@@ -85,7 +85,7 @@ switch ($endpoint) {
             echo json_encode([
                 "versao_nome" => "1.1.0",
                 "build_numero" => 5, 
-                "url_apk" => "https://github.com/jhownny/marketlist_mobile/releases/download/v1.1.0/MarketList_v1.3.0.apk"
+                "url_apk" => "https://github.com/jhownny/marketlist_mobile/releases/download/v1.3.0/MarketList_v1.3.0.apk"
             ]);
         }
     break;
