@@ -57,7 +57,46 @@ if (!$mysqli->set_charset("utf8mb4")) {
 }
 
 // ---------------------------------------------------------
-// 3. ROTEAMENTO
+// 3. FUNÇÕES JWT (JSON WEB TOKEN) - SEGURANÇA MÁXIMA
+// ---------------------------------------------------------
+function base64UrlEncode($data) {
+    return str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($data));
+}
+
+function gerar_jwt($payload, $secret) {
+    $header = json_encode(['typ' => 'JWT', 'alg' => 'HS256']);
+    $base64UrlHeader = base64UrlEncode($header);
+    $base64UrlPayload = base64UrlEncode(json_encode($payload));
+    $signature = hash_hmac('sha256', $base64UrlHeader . "." . $base64UrlPayload, $secret, true);
+    $base64UrlSignature = base64UrlEncode($signature);
+    return $base64UrlHeader . "." . $base64UrlPayload . "." . $base64UrlSignature;
+}
+
+function validar_jwt($token, $secret) {
+    $parts = explode('.', $token);
+    if (count($parts) !== 3) return false;
+    list($header, $payload, $signature) = $parts;
+    $validSignature = base64UrlEncode(hash_hmac('sha256', $header . "." . $payload, $secret, true));
+    if (hash_equals($validSignature, $signature)) {
+        $dados = json_decode(base64_decode(str_replace(['-', '_'], ['+', '/'], $payload)), true);
+        if (isset($dados['exp']) && $dados['exp'] < time()) return false; // Token expirado
+        return $dados;
+    }
+    return false;
+}
+
+function getBearerToken() {
+    $headers = $_SERVER['Authorization'] ?? $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    if (empty($headers) && function_exists('apache_request_headers')) {
+        $requestHeaders = apache_request_headers();
+        $headers = $requestHeaders['Authorization'] ?? '';
+    }
+    if (preg_match('/Bearer\s(\S+)/', $headers, $matches)) return $matches[1];
+    return null;
+}
+
+// ---------------------------------------------------------
+// 4. ROTEAMENTO E INTERCEPTADOR JWT
 // ---------------------------------------------------------
 
 $uri = $_SERVER['REQUEST_URI'];
@@ -71,36 +110,49 @@ function limpar_utf8($array) {
     }, $array);
 }
 
+$uid_autenticado = null;
+$rotas_privadas = ['grupos', 'itens', 'finalizar'];
+
+if (in_array($endpoint, $rotas_privadas) && $method !== 'OPTIONS') {
+    $token = getBearerToken();
+    $dados_token = validar_jwt($token, API_SECRET);
+    if (!$dados_token) {
+        http_response_code(401);
+        echo json_encode(["erro" => "Sessão expirada ou inválida. Faça login novamente."]);
+        exit;
+    }
+    
+    $uid_autenticado = $dados_token['id']; 
+}
+
 // ---------------------------------------------------------
-// 4. LÓGICA DA API
+// 5. LÓGICA DA API
 // ---------------------------------------------------------
 
 switch ($endpoint) {
 
     // ====================================================
-    // ROTA: VERIFICAR ATUALIZAÇÃO
+    // ROTA: VERIFICAR ATUALIZAÇÃO (INTACTA)
     // ====================================================
     case 'atualizacao':
         if ($method == 'GET') {
             echo json_encode([
-                "versao_nome" => "1.3.0",
-                "build_numero" => 7, 
-                "url_apk" => "https://github.com/jhownny/marketlist_mobile/releases/download/v1.3.0/MarketList_v1.3.0.apk"
+                "versao_nome" => "1.4.0",
+                "build_numero" => 8, 
+                "url_apk" => "https://github.com/jhownny/marketlist_mobile/releases/download/v1.4.0/MarketList_v1.4.0.apk"
             ]);
         }
-    break;
+        break;
 
     // ====================================================
-    // ROTA: USUARIOS (ATUALIZADA)
+    // ROTA: USUARIOS (INTACTA PARA O BOT DO TELEGRAM)
     // ====================================================
     case 'usuarios':
         if ($method == 'GET') {
-            // Permite o Bot perguntar: "Quem é o dono do chat_id 12345?"
             $chat_id = $_GET['telegram_chat_id'] ?? null;
             
             $sql = "SELECT id, nome, email FROM usuarios";
             if ($chat_id) {
-                // Filtro específico para o Bot
                 $sql .= " WHERE telegram_chat_id = '" . $mysqli->real_escape_string($chat_id) . "'";
             }
 
@@ -131,32 +183,28 @@ switch ($endpoint) {
         break;
 
     // ====================================================
-    // ROTA: GRUPOS
+    // ROTA: GRUPOS (PROTEGIDA)
     // ====================================================
     case 'grupos':
-        // GET: Listar grupos de um usuário (ex: ?usuario_id=1)
         if ($method == 'GET') {
-            $uid = $_GET['usuario_id'] ?? null;
-            if (!$uid) {
-                http_response_code(400); echo json_encode(["erro" => "Faltou ?usuario_id=X"]); break;
-            }
+            // Ignora o ?usuario_id da URL e usa o do Token!
             $stmt = $mysqli->prepare("SELECT * FROM grupos WHERE usuario_id = ?");
-            $stmt->bind_param("i", $uid);
+            $stmt->bind_param("i", $uid_autenticado);
             $stmt->execute();
             $result = $stmt->get_result();
             $data = [];
             while ($row = $result->fetch_assoc()) { $data[] = limpar_utf8($row); }
             echo json_encode($data);
         }
-        // POST: Criar novo grupo
         elseif ($method == 'POST') {
             $input = json_decode(file_get_contents('php://input'), true);
-            if (empty($input['usuario_id']) || empty($input['nome'])) {
-                http_response_code(400); echo json_encode(["erro" => "Faltou usuario_id ou nome"]); break;
+            if (empty($input['nome'])) {
+                http_response_code(400); echo json_encode(["erro" => "Faltou o nome do grupo"]); break;
             }
             $stmt = $mysqli->prepare("INSERT INTO grupos (usuario_id, nome, icone) VALUES (?, ?, ?)");
             $icone = $input['icone'] ?? null;
-            $stmt->bind_param("iss", $input['usuario_id'], $input['nome'], $icone);
+            // Usa o ID do Token
+            $stmt->bind_param("iss", $uid_autenticado, $input['nome'], $icone);
             
             if ($stmt->execute()) {
                 http_response_code(201); echo json_encode(["id" => $mysqli->insert_id, "status" => "grupo criado"]);
@@ -167,27 +215,21 @@ switch ($endpoint) {
         break;
 
     // ====================================================
-    // ROTA: ITENS (A LISTA DE COMPRAS)
+    // ROTA: ITENS (A LISTA DE COMPRAS - PROTEGIDA)
     // ====================================================
     case 'itens':
-        // GET: Listar itens (pode filtrar por ?grupo_id=X e ?status=pendente)
         if ($method == 'GET') {
-            $uid = $_GET['usuario_id'] ?? null;
-            if (!$uid) { http_response_code(400); echo json_encode(["erro" => "Faltou ?usuario_id=X"]); break; }
-            
+            // Usa o ID do Token na query
             $sql = "SELECT i.*, g.nome as nome_grupo FROM itens i LEFT JOIN grupos g ON i.grupo_id = g.id WHERE i.usuario_id = ?";
-            
-            // Filtro opcional por grupo
             if (isset($_GET['grupo_id'])) {
                 $sql .= " AND i.grupo_id = " . intval($_GET['grupo_id']);
             }
-            // Filtro opcional por status (pendente/finalizado)
             if (isset($_GET['status'])) {
                 $sql .= " AND i.status = '" . $mysqli->real_escape_string($_GET['status']) . "'";
             }
             
             $stmt = $mysqli->prepare($sql);
-            $stmt->bind_param("i", $uid);
+            $stmt->bind_param("i", $uid_autenticado);
             $stmt->execute();
             $result = $stmt->get_result();
             $data = [];
@@ -195,17 +237,16 @@ switch ($endpoint) {
             echo json_encode($data);
         }
         
-        // POST: Adicionar item na lista
         elseif ($method == 'POST') {
             $input = json_decode(file_get_contents('php://input'), true);
-            // Validação mínima
-            if (empty($input['usuario_id']) || empty($input['grupo_id']) || empty($input['produto'])) {
-                http_response_code(400); echo json_encode(["erro" => "Faltam dados (usuario_id, grupo_id, produto)"]); break;
+            if (empty($input['grupo_id']) || empty($input['produto'])) {
+                http_response_code(400); echo json_encode(["erro" => "Faltam dados (grupo_id, produto)"]); break;
             }
             
             $stmt = $mysqli->prepare("INSERT INTO itens (usuario_id, grupo_id, produto, preco, status) VALUES (?, ?, ?, ?, 'pendente')");
             $preco = $input['preco'] ?? null;
-            $stmt->bind_param("iisd", $input['usuario_id'], $input['grupo_id'], $input['produto'], $preco);
+            // Usa o ID do Token!
+            $stmt->bind_param("iisd", $uid_autenticado, $input['grupo_id'], $input['produto'], $preco);
             
             if ($stmt->execute()) {
                 http_response_code(201); echo json_encode(["id" => $mysqli->insert_id, "status" => "item adicionado"]);
@@ -214,64 +255,56 @@ switch ($endpoint) {
             }
         }
 
-        // DELETE: Remover item (via ?id=X)
         elseif ($method == 'DELETE') {
             $id = $_GET['id'] ?? null;
             if (!$id) { http_response_code(400); echo json_encode(["erro" => "Faltou ?id=X"]); break; }
             
-            $stmt = $mysqli->prepare("DELETE FROM itens WHERE id = ?");
-            $stmt->bind_param("i", $id);
+            // Segurança: Só deleta se o item pertencer ao usuário do Token!
+            $stmt = $mysqli->prepare("DELETE FROM itens WHERE id = ? AND usuario_id = ?");
+            $stmt->bind_param("ii", $id, $uid_autenticado);
             if ($stmt->execute()) echo json_encode(["status" => "deletado"]);
             else echo json_encode(["erro" => $stmt->error]);
         }
-        
 
-        // PUT: Editar item existente (Atualização de Nome e Preço)
         elseif ($method == 'PUT') {
             $input = json_decode(file_get_contents('php://input'), true);
-            
-            // Validação para garantir que recebemos o ID e os novos dados
             if (empty($input['id']) || empty($input['produto']) || !isset($input['preco'])) {
-                http_response_code(400); 
-                echo json_encode(["erro" => "Faltam dados (id, produto, preco)"]); 
-                break;
+                http_response_code(400); echo json_encode(["erro" => "Faltam dados"]); break;
             }
             
-            $stmt = $mysqli->prepare("UPDATE itens SET produto = ?, preco = ? WHERE id = ?");
-            // "sdi" significa: String (produto), Double (preco), Integer (id)
-            $stmt->bind_param("sdi", $input['produto'], $input['preco'], $input['id']);
+            // Segurança: Só edita se o item pertencer ao usuário do Token!
+            $stmt = $mysqli->prepare("UPDATE itens SET produto = ?, preco = ? WHERE id = ? AND usuario_id = ?");
+            $stmt->bind_param("sdii", $input['produto'], $input['preco'], $input['id'], $uid_autenticado);
             
             if ($stmt->execute()) {
                 echo json_encode(["status" => "item atualizado"]);
             } else {
-                http_response_code(500); 
-                echo json_encode(["erro" => $stmt->error]);
+                http_response_code(500); echo json_encode(["erro" => $stmt->error]);
             }
         }
         break;
 
     // ====================================================
-    // ROTA: FINALIZAR (SOMA TUDO E FECHA A LISTA)
+    // ROTA: FINALIZAR (PROTEGIDA)
     // ====================================================
     case 'finalizar':
         if ($method == 'POST') {
             $input = json_decode(file_get_contents('php://input'), true);
-            
-            if (empty($input['usuario_id']) || empty($input['grupo_id'])) {
-                http_response_code(400); echo json_encode(["erro" => "Informe usuario_id e grupo_id"]); break;
+            if (empty($input['grupo_id'])) {
+                http_response_code(400); echo json_encode(["erro" => "Informe o grupo_id"]); break;
             }
 
-            //Calcula o total gasto
+            // Usa o ID do Token para somar
             $stmt = $mysqli->prepare("SELECT SUM(preco) as total FROM itens WHERE usuario_id = ? AND grupo_id = ? AND status = 'pendente'");
-            $stmt->bind_param("ii", $input['usuario_id'], $input['grupo_id']);
+            $stmt->bind_param("ii", $uid_autenticado, $input['grupo_id']);
             $stmt->execute();
             $res = $stmt->get_result()->fetch_assoc();
             $total = $res['total'] ?? 0;
             $stmt->close();
 
-            //Marca tudo como finalizado
+            // Usa o ID do Token para finalizar
             $stmtUpdate = $mysqli->prepare("UPDATE itens SET status = 'finalizado', data_finalizacao = NOW() WHERE usuario_id = ? AND grupo_id = ? AND status = 'pendente'");
-            $stmtUpdate->bind_param("ii", $input['usuario_id'], $input['grupo_id']);
+            $stmtUpdate->bind_param("ii", $uid_autenticado, $input['grupo_id']);
             
             if ($stmtUpdate->execute()) {
                 echo json_encode([
@@ -286,7 +319,7 @@ switch ($endpoint) {
         break;
 
     // ====================================================
-    // ROTA: LOGIN (NOVA - Para o comando /conectar)
+    // ROTA: LOGIN (GERAÇÃO DO TOKEN)
     // ====================================================
     case 'login':
         if ($method == 'POST') {
@@ -296,7 +329,6 @@ switch ($endpoint) {
                 http_response_code(400); echo json_encode(["erro" => "Email e senha obrigatórios"]); break;
             }
 
-            // Busca usuário pelo email
             $stmt = $mysqli->prepare("SELECT id, nome, senha FROM usuarios WHERE email = ?");
             $stmt->bind_param("s", $input['email']);
             $stmt->execute();
@@ -310,13 +342,22 @@ switch ($endpoint) {
                     $stmtUp->execute();
                 }
 
+                // -> AQUI NASCE O TOKEN VÁLIDO POR 7 DIAS! <-
+                $payload = [
+                    'id' => $user['id'],
+                    'nome' => $user['nome'],
+                    'exp' => time() + (86400 * 7) 
+                ];
+                $token_jwt = gerar_jwt($payload, API_SECRET);
+
                 echo json_encode([
                     "status" => "logado",
                     "id" => $user['id'],
-                    "nome" => $user['nome']
+                    "nome" => $user['nome'],
+                    "token" => $token_jwt // Enviando o crachá de volta!
                 ]);
             } else {
-                http_response_code(401); // Unauthorized
+                http_response_code(401); 
                 echo json_encode(["erro" => "Credenciais inválidas"]);
             }
         }
