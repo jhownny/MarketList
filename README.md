@@ -1,6 +1,6 @@
 # 🛒 MarketList
 
-![Project Status](https://img.shields.io/badge/status-active-success)
+![Project Status](https://img.shields.io/badge/status-deactivated-red)
 ![PHP Version](https://img.shields.io/badge/php-8.0%2B-777BB4)
 ![Database](https://img.shields.io/badge/mysql-database-00758F)
 ![Interface](https://img.shields.io/badge/telegram-bot-2CA5E0)
